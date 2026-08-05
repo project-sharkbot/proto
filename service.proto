@@ -1,0 +1,408 @@
+syntax = "proto3";
+
+package aura.bot.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Rewritten proto for SharkBot: includes a common RpcResult wrapper (errNo/errMsg)
+// and CallerContext for permission checks. All responses include RpcResult as
+// field number 1 so clients and the API can always inspect errNo/errMsg.
+
+// ---------------------------------------------------------------------------
+// Common messages
+// ---------------------------------------------------------------------------
+message RpcResult {
+  int32 err_no = 1;         // 0 = success, non-zero = domain error
+  string err_msg = 2;       // human-readable message
+  map<string, string> meta = 3; // optional metadata (e.g., validation details)
+}
+
+message CallerContext {
+  Platform platform = 1;           // discord, twitch
+  string server_fk = 2;            // guild/channel id on the platform
+  string channel_id = 3;
+  string user_id = 4;              // platform user id who initiated the action
+  repeated string role_ids = 5;    // platform role ids (for permission resolution)
+  string auth_metadata = 6;        // optional (e.g., bot-supplied trace id)
+}
+
+// ---------------------------------------------------------------------------
+// Enums (align semantics with infra/db types)
+// ---------------------------------------------------------------------------
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_DISCORD = 1;
+  PLATFORM_TWITCH = 2;
+}
+
+enum RuleType {
+  RULE_UNSPECIFIED = 0;
+  RULE_CAPS = 1;
+  RULE_SPOILERS = 2;
+  RULE_EMOJIS = 3;
+  RULE_SPAM_MESSAGES = 4;
+  RULE_REPEATED_TEXT = 5;
+}
+
+enum ActionType {
+  ACTION_UNSPECIFIED = 0;
+  ACTION_NONE = 1;
+  ACTION_DELETE_MESSAGE = 2;
+  ACTION_WARN_USER = 3;
+  ACTION_TEMP_BAN = 4;
+  ACTION_PERMA_BAN = 5;
+}
+
+enum GameType {
+  GAME_UNSPECIFIED = 0;
+  GAME_TICTACTOE = 1;
+  GAME_CONNECT4 = 2;
+}
+
+enum TransactionType {
+  TX_UNSPECIFIED = 0;
+  TX_DAILY_REWARD = 1;
+  TX_GAMBLE = 2;
+  TX_USER_TRANSFER = 3;
+  TX_GAME_PAYOUT = 4;
+  TX_ADMIN_ADJUST = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Moderation service: rule resolution, checks, ruleset CRUD, overrides
+// ---------------------------------------------------------------------------
+service ModerationService {
+  // Called by bots to check a message. Includes CallerContext for rule resolution.
+  rpc CheckMessage (CheckMessageRequest) returns (CheckMessageResponse);
+
+  // Ruleset management (requires permission checks)
+  rpc CreateRuleset (CreateRulesetRequest) returns (CreateRulesetResponse);
+  rpc UpdateRuleset (UpdateRulesetRequest) returns (UpdateRulesetResponse);
+  rpc DeleteRuleset (DeleteRulesetRequest) returns (DeleteRulesetResponse);
+  rpc SetActiveRuleset (SetActiveRulesetRequest) returns (SetActiveRulesetResponse);
+
+  // Read operations
+  rpc GetRulesets (GetRulesetsRequest) returns (GetRulesetsResponse);
+  rpc GetActiveRuleset (GetActiveRulesetRequest) returns (GetActiveRulesetResponse);
+
+  // Overrides
+  rpc CreateRulesetOverride (CreateRulesetOverrideRequest) returns (CreateRulesetOverrideResponse);
+  rpc ListRulesetOverrides (ListRulesetOverridesRequest) returns (ListRulesetOverridesResponse);
+}
+
+message CheckMessageRequest {
+  CallerContext ctx = 1;
+  string message_content = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message CheckMessageResponse {
+  RpcResult result = 1;
+  bool violation_found = 2;
+  ActionType action_required = 3;
+  RuleType rule_violated = 4;
+  string rule_id = 5;           // internal rule UUID if applicable
+  string log_id = 6;            // moderation_logs id
+  int32 strike_count = 7;
+  string human_message = 8;
+}
+
+// Ruleset CRUD
+message CreateRulesetRequest {
+  CallerContext ctx = 1;
+  string ruleset_name = 2;
+  repeated RuleConfig rules = 3;
+  string belongs_to_community_id = 4; // optional: community UUID
+}
+
+message CreateRulesetResponse {
+  RpcResult result = 1;
+  string ruleset_id = 2;
+}
+
+message UpdateRulesetRequest {
+  CallerContext ctx = 1;
+  string ruleset_id = 2;
+  string ruleset_name = 3;
+  repeated RuleConfig rules = 4;
+}
+
+message UpdateRulesetResponse {
+  RpcResult result = 1;
+}
+
+message DeleteRulesetRequest {
+  CallerContext ctx = 1;
+  string ruleset_id = 2;
+}
+
+message DeleteRulesetResponse {
+  RpcResult result = 1;
+}
+
+message SetActiveRulesetRequest {
+  CallerContext ctx = 1;
+  string ruleset_id = 2;
+}
+
+message SetActiveRulesetResponse {
+  RpcResult result = 1;
+}
+
+message GetRulesetsRequest {
+  CallerContext ctx = 1; // optional; used to filter by server
+  Platform platform = 2;
+  string server_fk = 3;
+}
+
+message RuleConfig {
+  RuleType rule_type = 1;
+  bool is_enabled = 2;
+  int32 threshold_value = 3;
+  int32 threshold_window_sec = 4;
+  google.protobuf.Struct extra = 5;
+}
+
+message Ruleset {
+  string id = 1;
+  string name = 2;
+  Platform platform = 3;
+  bool is_active = 4;
+  repeated RuleConfig rules = 5;
+}
+
+message GetRulesetsResponse {
+  RpcResult result = 1;
+  repeated Ruleset rulesets = 2;
+}
+
+message GetActiveRulesetRequest {
+  CallerContext ctx = 1;
+}
+
+message GetActiveRulesetResponse {
+  RpcResult result = 1;
+  Ruleset active_ruleset = 2;
+  repeated string applied_override_ids = 3;
+}
+
+// Ruleset overrides
+message CreateRulesetOverrideRequest {
+  CallerContext ctx = 1;
+  string ruleset_id = 2;
+  string server_fk = 3;
+  string channel_id = 4;
+  string role_id = 5;
+  string user_id = 6;
+  int32 priority = 7;
+  bool override_enabled = 8;
+  int32 override_threshold_value = 9;
+  int32 override_window_sec = 10;
+}
+
+message CreateRulesetOverrideResponse {
+  RpcResult result = 1;
+  string override_id = 2;
+}
+
+message ListRulesetOverridesRequest {
+  CallerContext ctx = 1;
+  string ruleset_id = 2;
+  string server_fk = 3;
+}
+
+message RulesetOverride {
+  string id = 1;
+  string ruleset_id = 2;
+  string server_fk = 3;
+  string channel_id = 4;
+  string role_id = 5;
+  string user_id = 6;
+  int32 priority = 7;
+  bool override_enabled = 8;
+  int32 override_threshold_value = 9;
+  int32 override_window_sec = 10;
+}
+
+message ListRulesetOverridesResponse {
+  RpcResult result = 1;
+  repeated RulesetOverride overrides = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Economy service: players, connections, transactions
+// ---------------------------------------------------------------------------
+service EconomyService {
+  rpc AddNewUser (AddNewUserRequest) returns (AddNewUserResponse);
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceResponse);
+  rpc PayUser (PayUserRequest) returns (PayUserResponse);
+  rpc ProcessDailyReward (ProcessDailyRewardRequest) returns (ProcessDailyRewardResponse);
+  rpc GenerateConnectionCode (GenerateConnectionCodeRequest) returns (GenerateConnectionCodeResponse);
+  rpc AddConnection (AddConnectionRequest) returns (AddConnectionResponse);
+  rpc ListTransactions (ListTransactionsRequest) returns (ListTransactionsResponse);
+}
+
+message AddNewUserRequest {
+  CallerContext ctx = 1;
+  string platform_user_id = 2;
+}
+
+message AddNewUserResponse {
+  RpcResult result = 1;
+  string internal_player_id = 2; // UUID
+  int64 initial_balance = 3;
+}
+
+message GetBalanceRequest {
+  CallerContext ctx = 1;
+  string player_id = 2; // optional: internal UUID
+}
+
+message GetBalanceResponse {
+  RpcResult result = 1;
+  string player_id = 2;
+  int64 balance = 3;
+}
+
+message PayUserRequest {
+  CallerContext ctx = 1; // caller context used for rate-limiting/auditing; sender can be ctx.user_id or explicit
+  string sender_id = 2;
+  string receiver_id = 3;
+  int64 amount = 4;
+}
+
+message PayUserResponse {
+  RpcResult result = 1;
+  string transaction_id = 2;
+  int64 sender_new_balance = 3;
+  int64 receiver_new_balance = 4;
+}
+
+message ProcessDailyRewardRequest {
+  CallerContext ctx = 1;
+  string player_id = 2;
+}
+
+message ProcessDailyRewardResponse {
+  RpcResult result = 1;
+  bool claimed = 2;
+  int64 reward_amount = 3;
+  google.protobuf.Timestamp next_available = 4;
+}
+
+message GenerateConnectionCodeRequest {
+  CallerContext ctx = 1;
+  string source_player_id = 2;
+  int32 ttl_seconds = 3;
+  Platform target_platform = 4;
+}
+
+message GenerateConnectionCodeResponse {
+  RpcResult result = 1;
+  string connection_code = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message AddConnectionRequest {
+  CallerContext ctx = 1;
+  string source_player_id = 2;
+  string connection_code = 3;
+  string target_platform_user_id = 4;
+  Platform target_platform = 5;
+}
+
+message AddConnectionResponse {
+  RpcResult result = 1;
+  string unified_player_id = 2;
+}
+
+message TransactionRecord {
+  string id = 1;
+  string player_id = 2;
+  int64 amount = 3;
+  TransactionType tx_type = 4;
+  google.protobuf.Struct metadata = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListTransactionsRequest {
+  CallerContext ctx = 1;
+  string player_id = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListTransactionsResponse {
+  RpcResult result = 1;
+  repeated TransactionRecord transactions = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Optional: GameService left as-is but responses now include RpcResult where applicable
+// ---------------------------------------------------------------------------
+service GameService {
+  rpc CreateGame (CreateGameRequest) returns (CreateGameResponse);
+  rpc JoinGame (JoinGameRequest) returns (JoinGameResponse);
+  rpc MakeMove (MakeMoveRequest) returns (MakeMoveResponse);
+  rpc GetGameStatus (GetGameStatusRequest) returns (GetGameStatusResponse);
+  rpc GenerateConnectionCode (GenerateConnectionCodeRequest) returns (GenerateConnectionCodeResponse);
+  rpc AddConnection (AddConnectionRequest) returns (AddConnectionResponse);
+}
+
+message CreateGameRequest {
+  CallerContext ctx = 1;
+  string creator_player_id = 2;
+  GameType game_type = 3;
+  int64 bet_amount = 4;
+}
+
+message CreateGameResponse {
+  RpcResult result = 1;
+  string game_id = 2;
+  string status = 3;
+}
+
+message JoinGameRequest {
+  CallerContext ctx = 1;
+  string game_id = 2;
+}
+
+message JoinGameResponse {
+  RpcResult result = 1;
+  google.protobuf.Struct initial_board_state = 2;
+  string current_turn_id = 3;
+}
+
+message MakeMoveRequest {
+  CallerContext ctx = 1;
+  string game_id = 2;
+  string player_id = 3;
+  int32 move_index = 4;
+  google.protobuf.Struct move_data = 5;
+}
+
+message MakeMoveResponse {
+  RpcResult result = 1;
+  google.protobuf.Struct updated_board_state = 2;
+  string current_turn_id = 3;
+  bool game_ended = 4;
+  string winner_id = 5;
+  int64 payout_amount = 6;
+}
+
+message GetGameStatusRequest {
+  CallerContext ctx = 1;
+  string game_id = 2;
+}
+
+message GetGameStatusResponse {
+  RpcResult result = 1;
+  string game_id = 2;
+  GameType game_type = 3;
+  string status = 4;
+  google.protobuf.Struct board_state = 5;
+  string current_turn_id = 6;
+  string player_1_id = 7;
+  string player_2_id = 8;
+}
