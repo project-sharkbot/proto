@@ -1,0 +1,136 @@
+syntax = "proto3";
+package aura.sharkbot.v1.moderation;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "common.proto";
+
+message CheckMessageRequest {
+    common.CallerContext ctx = 1;
+    string message_content = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message CheckMessageResponse {
+    bool violation_found = 1;
+    common.ActionType action_required = 2;
+    common.RuleType rule_violated = 3;
+    string rule_id = 4;           // internal rule UUID if applicable
+    string log_id = 5;            // moderation_logs id
+    int32 strike_count = 6;
+    string human_message = 7;
+}
+
+// Ruleset CRUD
+message CreateRulesetRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_name = 2;
+    repeated RuleConfig rules = 3;
+    string belongs_to_community_id = 4; // optional: community UUID
+}
+
+message CreateRulesetResponse {
+    string ruleset_id = 1;
+}
+
+message UpdateRulesetRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_id = 2;
+    string ruleset_name = 3;
+    repeated RuleConfig rules = 4;
+}
+
+message UpdateRulesetResponse {
+}
+
+message DeleteRulesetRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_id = 2;
+}
+
+message DeleteRulesetResponse {
+}
+
+message SetActiveRulesetRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_id = 2;
+}
+
+message SetActiveRulesetResponse {
+}
+
+message GetRulesetsRequest {
+    common.CallerContext ctx = 1; // optional; used to filter by server
+    common.Platform platform = 2;
+    string server_fk = 3;
+}
+
+message RuleConfig {
+    common.RuleType rule_type = 1;
+    bool is_enabled = 2;
+    int32 threshold_value = 3;
+    int32 threshold_window_sec = 4;
+    google.protobuf.Struct extra = 5;
+}
+
+message Ruleset {
+    string id = 1;
+    string name = 2;
+    common.Platform platform = 3;
+    bool is_active = 4;
+    repeated RuleConfig rules = 5;
+}
+
+message GetRulesetsResponse {
+    repeated Ruleset rulesets = 1;
+}
+
+message GetActiveRulesetRequest {
+    common.CallerContext ctx = 1;
+}
+
+message GetActiveRulesetResponse {
+    Ruleset active_ruleset = 1;
+    repeated string applied_override_ids = 2;
+}
+
+// Ruleset overrides
+message CreateRulesetOverrideRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_id = 2;
+    string server_fk = 3;
+    string channel_fk = 4;
+    string role_fk = 5;
+    string user_fk = 6;
+    int32 priority = 7;
+    bool override_enabled = 8;
+    int32 override_threshold_value = 9;
+    int32 override_window_sec = 10;
+}
+
+message CreateRulesetOverrideResponse {
+    string override_id = 1;
+}
+
+message ListRulesetOverridesRequest {
+    common.CallerContext ctx = 1;
+    string ruleset_id = 2;
+    string server_fk = 3;
+}
+
+message RulesetOverride {
+    string id = 1;
+    string ruleset_id = 2;
+    string server_fk = 3;
+    string channel_fk = 4;
+    string role_fk = 5;
+    string user_fk = 6;
+    int32 priority = 7;
+    bool override_enabled = 8;
+    int32 override_threshold_value = 9;
+    int32 override_window_sec = 10;
+}
+
+message ListRulesetOverridesResponse {
+    repeated RulesetOverride overrides = 1;
+}

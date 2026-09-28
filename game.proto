@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package aura.sharkbot.v1.game;
+
+import "google/protobuf/struct.proto";
+import "common.proto";
+
+
+message CreateGameRequest {
+    common.CallerContext ctx = 1;
+    string creator_player_id = 2;
+    common.GameType game_type = 3;
+    int64 bet_amount = 4;
+}
+
+message CreateGameResponse {
+    string game_id = 1;
+    string status = 2;
+}
+
+message JoinGameRequest {
+    common.CallerContext ctx = 1;
+    string game_id = 2;
+}
+
+message JoinGameResponse {
+    google.protobuf.Struct initial_board_state = 1;
+    string current_turn_id = 2;
+}
+
+message MakeMoveRequest {
+    common.CallerContext ctx = 1;
+    string game_id = 2;
+    string player_id = 3;
+    int32 move_index = 4;
+    google.protobuf.Struct move_data = 5;
+}
+
+message MakeMoveResponse {
+    google.protobuf.Struct updated_board_state = 1;
+    string current_turn_id = 2;
+    bool game_ended = 3;
+    string winner_id = 4;
+    int64 payout_amount = 5;
+}
+
+message GetGameStatusRequest {
+    common.CallerContext ctx = 1;
+    string game_id = 2;
+}
+
+message GetGameStatusResponse {
+    string game_id = 1;
+    common.GameType game_type = 2;
+    string status = 3;
+    google.protobuf.Struct board_state = 4;
+    string current_turn_id = 5;
+    string player_1_id = 6;
+    string player_2_id = 7;
+}

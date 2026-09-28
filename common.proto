@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package aura.sharkbot.v1.common;
+ 
+// ------------------------------------------
+// Common objects                           |
+// ------------------------------------------
+
+// 1. Enums
+
+enum Platform {
+  PLATFORM_UNSPECIFIED = 0;
+  PLATFORM_DISCORD = 1;
+  PLATFORM_TWITCH = 2;
+}
+
+enum RuleType {
+  RULE_UNSPECIFIED = 0;
+  RULE_CAPS = 1;
+  RULE_SPOILERS = 2;
+  RULE_EMOJIS = 3;
+  RULE_SPAM_MESSAGES = 4;
+  RULE_REPEATED_TEXT = 5;
+}
+
+enum ActionType {
+  ACTION_UNSPECIFIED = 0;
+  ACTION_NONE = 1;
+  ACTION_DELETE_MESSAGE = 2;
+  ACTION_WARN_USER = 3;
+  ACTION_TEMP_BAN = 4;
+  ACTION_PERMA_BAN = 5;
+}
+
+enum GameType {
+  GAME_UNSPECIFIED = 0;
+  GAME_TICTACTOE = 1;
+  GAME_CONNECT4 = 2;
+}
+
+enum TransactionType {
+  TX_UNSPECIFIED = 0;
+  TX_DAILY_REWARD = 1;
+  TX_GAMBLE = 2;
+  TX_USER_TRANSFER = 3;
+  TX_GAME_PAYOUT = 4;
+  TX_ADMIN_ADJUST = 5;
+}
+
+// 2. Context 
+
+message CallerContext {
+    Platform platform = 1;
+    string server_fk = 2;           // Platform server/guild id
+    string channel_fk = 3;          // Platform channel/chat/group id  
+    string user_fk = 4;             // Platform user id 
+    repeated string role_fks = 5;   // Platform role ids 
+} 
+

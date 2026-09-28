@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package aura.sharkbot.v1.economy;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+import "common.proto";
+
+
+message AddNewUserRequest {
+    common.CallerContext ctx = 1;
+    string platform_user_id = 2;
+}
+
+message AddNewUserResponse {
+    string internal_player_id = 1; // UUID
+    int64 initial_balance = 2;
+}
+
+message GetBalanceRequest {
+    common.CallerContext ctx = 1;
+    string player_id = 2; // optional: internal UUID
+}
+
+message GetBalanceResponse {
+    string player_id = 1;
+    int64 balance = 2;
+}
+
+message PayUserRequest {
+    common.CallerContext ctx = 1;
+    string sender_id = 2;
+    string receiver_id = 3;
+    int64 amount = 4;
+}
+
+message PayUserResponse {
+    string transaction_id = 1;
+    int64 sender_new_balance = 2;
+    int64 receiver_new_balance = 3;
+}
+
+message ProcessDailyRewardRequest {
+    common.CallerContext ctx = 1;
+    string player_id = 2;
+}
+
+message ProcessDailyRewardResponse {
+    bool claimed = 1;
+    int64 reward_amount = 2;
+    google.protobuf.Timestamp next_available = 3;
+}
+
+message GenerateConnectionCodeRequest {
+    common.CallerContext ctx = 1;
+    string source_player_id = 2;
+    int32 ttl_seconds = 3;
+    common.Platform target_platform = 4;
+}
+
+message GenerateConnectionCodeResponse {
+    string connection_code = 1;
+    google.protobuf.Timestamp expires_at = 2;
+}
+
+message AddConnectionRequest {
+    common.CallerContext ctx = 1;
+    string source_player_id = 2;
+    string connection_code = 3;
+    string target_platform_user_id = 4;
+    common.Platform target_platform = 5;
+}
+
+message AddConnectionResponse {
+    string unified_player_id = 1;
+}
+
+message TransactionRecord {
+    string id = 1;
+    string player_id = 2;
+    int64 amount = 3;
+    common.TransactionType tx_type = 4;
+    google.protobuf.Struct metadata = 5;
+    google.protobuf.Timestamp created_at = 6;
+}
+
+message ListTransactionsRequest {
+    common.CallerContext ctx = 1;
+    string player_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message ListTransactionsResponse {
+    repeated TransactionRecord transactions = 1;
+}

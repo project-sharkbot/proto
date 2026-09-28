@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package aura.sharkbot.v1;
+
+import "economy.proto";
+import "moderation.proto";
+import "game.proto";
+
+service EconomyService {
+    rpc AddNewUser (economy.AddNewUserRequest) returns (economy.AddNewUserResponse);
+    rpc GetBalance (economy.GetBalanceRequest) returns (economy.GetBalanceResponse);
+    rpc PayUser (economy.PayUserRequest) returns (economy.PayUserResponse);
+    rpc ProcessDailyReward (economy.ProcessDailyRewardRequest) returns (economy.ProcessDailyRewardResponse);
+    rpc GenerateConnectionCode (economy.GenerateConnectionCodeRequest) returns (economy.GenerateConnectionCodeResponse);
+    rpc AddConnection (economy.AddConnectionRequest) returns (economy.AddConnectionResponse);
+    rpc ListTransactions (economy.ListTransactionsRequest) returns (economy.ListTransactionsResponse);
+}
+
+service ModerationService {
+    // Called by bots to check a message. Includes CallerContext for rule resolution.
+    rpc CheckMessage (moderation.CheckMessageRequest) returns (moderation.CheckMessageResponse);
+
+    // Ruleset management (requires permission checks)
+    rpc CreateRuleset (moderation.CreateRulesetRequest) returns (moderation.CreateRulesetResponse);
+    rpc UpdateRuleset (moderation.UpdateRulesetRequest) returns (moderation.UpdateRulesetResponse);
+    rpc DeleteRuleset (moderation.DeleteRulesetRequest) returns (moderation.DeleteRulesetResponse);
+    rpc SetActiveRuleset (moderation.SetActiveRulesetRequest) returns (moderation.SetActiveRulesetResponse);
+
+    // Read operations
+    rpc GetRulesets (moderation.GetRulesetsRequest) returns (moderation.GetRulesetsResponse);
+    rpc GetActiveRuleset (moderation.GetActiveRulesetRequest) returns (moderation.GetActiveRulesetResponse);
+
+    // Overrides
+    rpc CreateRulesetOverride (moderation.CreateRulesetOverrideRequest) returns (moderation.CreateRulesetOverrideResponse);
+    rpc ListRulesetOverrides (moderation.ListRulesetOverridesRequest) returns (moderation.ListRulesetOverridesResponse);
+}
+
+service GameService {
+    rpc CreateGame (game.CreateGameRequest) returns (game.CreateGameResponse);
+    rpc JoinGame (game.JoinGameRequest) returns (game.JoinGameResponse);
+    rpc MakeMove (game.MakeMoveRequest) returns (game.MakeMoveResponse);
+    rpc GetGameStatus (game.GetGameStatusRequest) returns (game.GetGameStatusResponse);
+}
