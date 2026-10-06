@@ -19,12 +19,33 @@ All the files are required to compile protocol buffers for use in a project, as 
 ### Naming/Versioning convention 
 
 Packages are named like `owner.project.version.<module>` for example `common.proto` is `aura.sharkbot.v1.common` package. 
-The exception here is `services.proto` which end at version. The result is like `owner.project.version.Service/Method`.
+The exception here is `services.proto` which ends at version. The result is like `owner.project.version.Service/Method`.
+For example: `/aura.sharkbot.v1.ModerationService/CheckMessage`.
 
-Versioning is meant to be as following `vM.m.p` (Major, minor, patch) -> `vM` (Major). 
-Therefore, any changes that break the current flow should be visible from the major version number. 
-Currently, there is no plan to implement a `changelog.md` or maintain git tags that contain this versioning convention 
-in this repo. There is an idea to make a pipeline that will create a release with
+Versioning follows Semantic versioning ([SemVer](https://semver.org/)) - `vM.m.p` where `M` indicates major (breaking) 
+changes like renamed fields, changed types or changing field numbers. This number should also match the package name. 
+
+Next, `m` marks minor changes like added fields, new enums, rpc methods or services. 
+This kind of change should keep consumers built against an older minor working.
+
+Lastly is `p` which is kept for compatibility with other version checking software but not necessarily required. 
+The "patches" would be for example adding/changing comments, since protobuf generators can include them in the generated 
+code. But overall such changes do not introduce any kind of practical alteration to the code or structure. 
+It is for this reason that the patch number of any release should typically be 0.
+
+#### Pre-release versions
+
+For simplicity the `v0.x.x` tags' breaking changes will only bump the minor version. 
+The package names will also be named `v1` until that release is ready. After `v1.0.0` tag is pushed, the rules above
+will apply.
+
+### Releases 
+
+To create a new release, a new annotated tag should be created matching the versioning annotation. After the tag with
+described changes is pushed (`git tag -a vM.m.p -m "change notes"` and `git push <remote> vM.m.p`), a GitHub workflow 
+creates a release. Servers/clients would pull these releases during compilation (like building the docker image) or 
+developers could download and include them in project development (e.g. using `curl` or `gh release download` depending 
+on repository visibility or authentication requirements).
 
 ## Usage 
 
@@ -34,8 +55,7 @@ This may require usage of plugins which can be found [here](https://github.com/p
 After running the compilation command, the output will contain generated message classes to use in your implementation.
 Do not commit those classes as they should always be generated to keep up to date.
 
-The output directory must exist before the command is executed - it is recommended to add a `.gitkeep` in the output 
-directory, force add it to a commit, then add the directory to `.gitignore`.
+Make sure the output directory exists or create it (for example `mkdir -p <out-dir>`) before running `protoc`.
 
 The versioning helps maintaining reproducibility and tracking changes, the `.gitattributes` file sets all other files to be excluded, allowing for minimal overhead when copying into projects. 
 
@@ -54,9 +74,9 @@ protoc -I . --descriptor_set_out=/dev/null *.proto
 #### Prerequisites 
 
 1. `npm` or any package manager 
-2. installed `ts-proto` package along with `proto` package (`npm i proto ts-proto`)
+2. Install dependencies (`npm install @bufbuild/protobuf @grpc/grpc-js ts-proto`)
 3. existing output directory (read above in [Usage](#usage))
-4. source protobuf files 
+4. source protobuf files (downloaded and unzipped from release section or added via other installation commands) 
 
 ```bash
 protoc --plugin=protoc-gen-ts_proto=./node_modules/.bin/protoc-gen-ts_proto \
