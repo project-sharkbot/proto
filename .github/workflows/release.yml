@@ -1,0 +1,78 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: write
+
+    env:
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Fetch tag
+        run: 'git fetch --force --no-tags origin "refs/tags/${TAG}:refs/tags/${TAG}"'
+      - name: Check tag
+        run: |
+          failed=0
+          fail() { echo "::error::$1"; failed=1; }
+          TAG_VERSION="${TAG#v}"
+          IFS=. read -r major minor patch error <<< "${TAG_VERSION}"
+          if [[ -n "$error" ]]; then 
+            fail "Too many version parts ($error) in $TAG"
+          fi
+          for part in major minor patch; do 
+            value="${!part}"
+            if [[ -z "$value" ]]; then                # empty
+              fail "Tag $TAG is missing a $part version"
+            elif [[ ! "$value" =~ ^[0-9]+$ ]]; then   # non digit
+              fail "Tag $TAG has an invalid $part version '$value' (digits only)"
+            elif [[ "$value" =~ ^0[0-9] ]]; then      # leading 0
+              fail "Tag $TAG has a leading zero in the $part version '$value'"
+            fi
+          done
+          if [[ "$(git cat-file -t "refs/tags/$TAG")" != tag ]]; then
+            fail "Tag $TAG is a lightweight tag; create it with: git tag -a $TAG -m \"...\""
+          else
+            message="$(git tag -l --format='%(contents)' "$TAG")"
+            if [[ -z "${message//[[:space:]]/}" ]]; then
+              fail "Tag $TAG has an empty message"
+            fi
+          fi
+          exit $failed
+      - name: Check naming
+        env:
+          OWNER: aura
+          PROJECT: sharkbot
+        run: |
+          failed=0
+          fail() { echo "::error::$1"; failed=1; }
+          TAG_VERSION="${TAG#v}"
+          IFS=. read -r major minor patch <<< "${TAG_VERSION}"
+          if (( major >= 1 )) ; then
+            shopt -s nullglob
+            protos=(*.proto)
+            if (( ${#protos[@]} == 0 )); then
+              fail "No .proto files found to check against tag $TAG"
+            fi
+            for f in "${protos[@]}"; do
+              if ! grep -Eq "^[[:space:]]*package[[:space:]]+${OWNER}\.${PROJECT}\.v${major}(\..+)*[[:space:]]*;" "$f"; then
+                fail "$f does not declare package ${OWNER}.${PROJECT}.v${major} (required by tag $TAG)"
+              fi
+            done
+          fi
+          exit $failed
+      - name: Install protoc
+        run: 'sudo apt-get update && sudo apt-get install -y protobuf-compiler libprotobuf-dev'
+      - name: Syntax Check
+        run: 'protoc -I . --descriptor_set_out=/dev/null *.proto'
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: 'gh release create "$TAG" --notes-from-tag'
