@@ -45,7 +45,7 @@ protoc -I . --descriptor_set_out=/dev/null <file>.proto   # syntax/type check
 - Platform-side IDs use the `*_fk` naming.
 - `.gitattributes` `export-ignore`s everything except the protos and README, so `git archive` and GitHub tag archives ship only those.
 
-Releases: pushing a `v*` git tag triggers a workflow that runs the syntax check and publishes a GitHub release (zip + tar.gz, notes from the annotated tag message). No CHANGELOG file. Versioning rules are still being settled. Progress, decisions and next steps: `.claude/proto-split.md`.
+Releases: pushing a `v*` git tag triggers `.github/workflows/release.yml`, which checks the tag (`vM.m.p` format, annotated with a non-empty message, package `vM` matching from v1 on), runs the syntax check and publishes a GitHub release with notes from the tag message. The release has no uploaded assets; consumers use GitHub's auto source archives (they honor `export-ignore` and unpack to `proto-<version>/`). The repo is private, so downloads go through `gh release download`. No CHANGELOG file. Versioning rules (SemVer; patch normally 0; during 0.x breaking changes bump the minor and the package stays `v1`) are in the README. Progress, decisions and next steps: `.claude/proto-split.md`.
 
 Enum values are meant to mirror the Postgres enum types in `../infra/db` (see `../infra/CLAUDE.md`, "Schema domains"); domain boundaries for the split should follow the DB's (moderation vs economy vs community core). Platform-side IDs are strings paired with a `Platform`; internal IDs are UUID strings.
 
@@ -79,4 +79,4 @@ This is a diploma project, so these rules take precedence over convenience. Sour
 
 ## Roadmap item for this repo
 
-**Phase 1, item 2 — Proto split**: split the monolithic proto into multiple files mirroring the DB's domain boundaries (done), then set up the release workflow and tag the first version (pending). Workflow: plan → implement → tests → CI check → propose commits → next item.
+**Phase 1, item 2 — Proto split**: split the monolithic proto into multiple files mirroring the DB's domain boundaries (done), then set up the release workflow and tag the first version (done: `v0.1.0`, 2026-10-06). Remaining follow-up is in the api repo (codegen script, see Consumers). Workflow: plan → implement → tests → CI check → propose commits → next item.

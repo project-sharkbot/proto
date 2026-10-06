@@ -34,6 +34,12 @@
   tags pass (v0.1.0, v1.0.0); v0.1, v1.x.0, v01.2.0, v1.2.3.4, lightweight and empty-message tags fail with the
   right errors; naming accepts v1 for v1.0.0, rejects v2.0.0 and a `v10` package. Not testable locally: the
   tag refetch, apt install and `gh release create` (first real run will show). Commits proposed in chat.
+- 2026-10-06: the owner committed and pushed `v0.1.0`; the release run succeeded. Claude checked the release
+  with gh: notes equal the tag message, no extra assets. Downloaded both auto archives with
+  `gh release download`: zip and tar.gz hold only README + 5 protos under `proto-0.1.0/`, and protoc
+  compiles them. The curl URL fails (private repo). Updated Open questions and Next session.
+- 2026-10-06: with the owner's go-ahead, Claude updated CLAUDE.md: the release process description (tag checks,
+  auto archives, private repo, versioning summary) and the roadmap item (release done, `v0.1.0`).
 
 ## Decisions
 - Errors use standard gRPC status codes; `RpcResult` is removed everywhere (owner, before this session).
@@ -49,23 +55,26 @@
   the change notes come from the annotated tag message or are auto-generated.
 - Versioning (owner, 2026-10-06): SemVer tags `vM.m.p`, first tag `v0.1.0`. MAJOR = breaking change
   (also bumps the package `vN`); MINOR = additions; PATCH kept for SemVer tooling, only for changes with
-  no wire/API effect (e.g. comments). Package stays `v1` during 0.x. Still open: README must state the
-  0.x rule (breaking changes bump the minor before 1.0).
+  no wire/API effect (e.g. comments). Package stays `v1` during 0.x; before 1.0 breaking changes bump
+  the minor (stated in the README).
 
 ## Open questions
-- README versioning section needs rewriting once the owner settles the compatibility rules (see Decisions).
+- Pin format for consumers (how api/bots record which proto tag they use) and the rules in the owner's
+  `version-check.sh`. During 0.x a consumer should pin an exact minor, since the minor bump can be breaking.
+- Docker builds fetching protos from the private repo need a token in the build (e.g. a build secret for
+  `gh`); decide when the api Dockerfile is written. `curl` on the archive URL only works if the repo is public.
+- Mark 0.x releases as GitHub pre-releases (`gh release create --prerelease`)? Currently v0.1.0 is "Latest".
+- Own release assets (stable checksums) vs GitHub's auto source archives (used now). Fine for Phase 1.
 
 ## Next session: start here
-1. README fixes still pending from the second review:
-   - Example command: the plugin must be named `protoc-gen-ts_proto`, and the files must be passed as `-I proto proto/*.proto`. Both were verified.
-   - Lines 26-27: replace the "no tags/changelog" text, which stops mid-sentence, with the tag/release flow and versioning rules.
-   - npm packages: `@bufbuild/protobuf`, `@grpc/grpc-js` and `ts-proto` (dev).
-   - Link anchor `#usage-` should be `#usage`; the `.gitkeep` advice could be `mkdir -p` or a `!.gitkeep` rule instead; remove trailing spaces.
-2. README versioning section: the owner is revising it after the 2026-10-06 review (0.x rule,
-   "reordered" -> renumbered, npm packages, tag/release flow).
-3. Release workflow (step 17) written and locally tested; owner commits it, then pushes the first
-   annotated tag `v0.1.0` (step 16). After the run, check that the release notes are the tag message.
-4. Api repo: `proto-gen-protoc.sh` must compile all files (step 12). That work belongs to the api repo.
+Proto split and release pipeline are done; `v0.1.0` is released (run 37525736249, success).
+1. Api repo (separate session, owner): `scripts/proto-gen-protoc.sh` must compile all files, not only
+   the first (step 12), and fetch a pinned tag. Archives unpack to `proto-<version>/` (e.g. `proto-0.1.0/`),
+   so the `-I` path must match.
+2. Optional: a `ci.yml` running the protoc syntax check on push/PR to `main`, so errors show before tagging.
+3. Next proto changes follow the README rules: during 0.x every release bumps the minor; after `v1.0.0`
+   never renumber or reuse field numbers (use `reserved`).
+4. TODO later items below.
 
 ## Checklist: split
 1. [x] `common.proto`: keep the 5 enums and `CallerContext`. Settle the `CallerContext` field names.
@@ -95,17 +104,18 @@
         This keeps them out of GitHub's tag archives, so a release archive holds only the protos + README.
 14. [x] Check locally: `git archive HEAD | tar t` should list only the files meant to ship.
 15. [-] ~~`CHANGELOG.md`~~: dropped; the notes come from the tag.
-16. [ ] First tag (`v1.0.0` or `v0.1.0`, still open) as an annotated tag; its message becomes the release notes.
+16. [x] First tag `v0.1.0` (annotated); its message became the release notes.
 17. [x] `.github/workflows/release.yml`, triggered on `push: tags: ['v*']`: install protoc (`apt-get install protobuf-compiler`)
         -> syntax check -> `git archive --format=zip|tar.gz --prefix=sharkbot-proto/` ->
         `gh release create $TAG <files> --notes-from-tag` (needs `permissions: contents: write`).
         Owner writes it, Claude reviews. Gotchas given: annotated tag lost by actions/checkout, GH_TOKEN for gh,
         libprotobuf-dev for well-known types, GitHub's own source archives already honor export-ignore.
-18. [ ] README: compile commands + how consumers fetch a tag (see below).
+18. [x] README: compile commands + how consumers fetch a tag.
 
 Consumer fetch:
-- Public repo: `curl -sL https://github.com/project-sharkbot/proto/archive/refs/tags/v1.0.0.tar.gz | tar xz`
-- Private repo: `gh release download v1.0.0 --repo project-sharkbot/proto --archive=tar.gz`
+- Public repo: `curl -sL https://github.com/project-sharkbot/proto/archive/refs/tags/v0.1.0.tar.gz | tar xz`
+  (fails now: the repo is private).
+- Private repo: `gh release download v0.1.0 --repo project-sharkbot/proto --archive=tar.gz` (tested 2026-10-06).
 
 ## TODO later
 - README: a Windows section (installing protoc; `*.proto` globs are not expanded by cmd/PowerShell for protoc).
